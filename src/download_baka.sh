@@ -1,50 +1,74 @@
 #!/bin/bash
 
 # 引数のチェック
-if [ $# -ne 2 ]; then
-  echo "Usage: $0 youtube_url seconds_to_trim"
+if [ $# -eq 0 ]; then
+  echo "Usage: $0 youtube_url [seconds_to_trim]"
   exit 1
 fi
 
-# 引数を変数に割り当て
+# YouTubeのURLは必須
 youtube_url=$1
-seconds_to_trim=$2
 
 # yt-dlpで使用する出力テンプレートを定義
-output_template="伊集院光_深夜の馬鹿力_%(upload_date>%Y年%m月%d日)s.%(ext)s"
+output_template="%(title)s.%(ext)s"
 
-# yt-dlpで音声ファイルをダウンロードし、ファイル名を取得
+# yt-dlpで音声ファイルをダウンロードし、オリジナルのファイル名を取得
 echo "Downloading audio from YouTube..."
-input_file=$(yt-dlp --quiet --print after_move:filepath --add-metadata --audio-format m4a -x -o "$output_template" "$youtube_url" --cookies-from-browser safari)
+original_file=$(yt-dlp --quiet --print after_move:filepath --add-metadata --audio-format m4a -x -o "$output_template" "$youtube_url" --cookies-from-browser safari)
 
-# 出力ファイル名を作成（接尾語として _trimmed を付ける）
-output_file="${input_file%.*}_trimmed.m4a"
+# スペースを含むファイル名を_に置換した新しいファイル名を作成
+input_file=$(echo "$original_file" | sed 's/[[:space:]]/_/g' | sed 's/　/_/g')
 
-# 音声ファイルの総時間を取得 (HH:MM:SS形式)
-duration=$(ffmpeg -i "$input_file" 2>&1 | grep "Duration" | awk '{print $2}' | tr -d ,)
-
-# 総時間を秒に変換
-total_seconds=$(echo "$duration" | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
-
-# カット後の時間を計算
-new_length=$(echo "$total_seconds - $seconds_to_trim" | bc)
-
-# 時間が0未満にならないようチェック
-if (( $(echo "$new_length < 0" | bc -l) )); then
-  echo "Error: seconds_to_trim is greater than the total length of the file."
-  exit 1
+# ファイルをリネーム
+if [ "$original_file" != "$input_file" ]; then
+    mv "$original_file" "$input_file"
+    echo "Renamed file to: $input_file"
 fi
 
-# FFmpegを使用してファイルをトリミング
-ffmpeg -i "$input_file" -t "$new_length" -acodec copy "$output_file"
+# seconds_to_trimが指定されている場合のみトリム処理を実行
+if [ $# -eq 2 ]; then
+    # 推奨：185秒
+    seconds_to_trim=$2
+    
+    # 出力ファイル名を作成（接尾語として _trimmed を付ける）
+    output_file="${input_file%.*}_trimmed.m4a"
 
-# 元ファイルを削除
-rm "$input_file"
-echo "Original file deleted: $input_file"
+    # 音声ファイルの総時間を取得 (秒単位)
+    duration=$(ffprobe -v quiet -select_streams a:0 -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$input_file")
 
-# トリミング後のファイル名を元のファイル名に戻す
-mv "$output_file" "$input_file"
-echo "File renamed to: $input_file"
+    # duration が空の場合のエラーチェック
+    if [ -z "$duration" ]; then
+        echo "Error: Could not determine file duration. File may not exist or be corrupted."
+        echo "Input file path: $input_file"
+        echo "Original file path: $original_file"
+        exit 1
+    fi
 
-# 終了メッセージ
-echo "File trimmed and renamed successfully: $input_file"
+    # 総時間を確認用に出力
+    echo "Total duration: $duration seconds"
+
+    # カット後の時間を計算（bcコマンドで小数点以下の計算を行う）
+    new_length=$(echo "$duration - $seconds_to_trim" | bc -l)
+
+    # 確認用に出力
+    echo "New length will be: $new_length seconds"
+
+    # 時間が0未満にならないようチェック
+    if (( $(echo "$new_length < 0" | bc -l) )); then
+        echo "Error: seconds_to_trim ($seconds_to_trim) is greater than the total length of the file ($duration seconds)."
+        exit 1
+    fi
+
+    # FFmpegを使用してファイルをトリミング
+    ffmpeg -hide_banner -loglevel error -i "$input_file" -t "$new_length" -acodec copy "$output_file"
+
+    # 元ファイルを削除
+    rm "$input_file"
+    echo "Original file deleted: $input_file"
+
+    # トリミング後のファイル名を元のファイル名に戻す
+    mv "$output_file" "$input_file"
+    echo "File trimmed and renamed successfully: $input_file"
+else
+    echo "No trimming requested. Download completed: $input_file"
+fi
