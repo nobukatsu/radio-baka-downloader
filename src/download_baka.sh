@@ -59,7 +59,7 @@ if (( $(echo "$new_length < 0" | bc -l) )); then
 fi
 
 # FFmpegを使用してファイルをトリミング
-ffmpeg -i "$input_file" -t "$new_length" -acodec copy "$output_file"
+ffmpeg -hide_banner -loglevel error -i "$input_file" -t "$new_length" -acodec copy "$output_file"
 
 # 元ファイルを削除
 rm "$input_file"
