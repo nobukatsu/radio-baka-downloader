@@ -1,14 +1,17 @@
 #!/bin/bash
 
-# 引数のチェック
-if [ $# -ne 2 ]; then
-  echo "Usage: $0 youtube_url seconds_to_trim"
+# 引数のチェックとデフォルト値の設定
+if [ $# -eq 0 ]; then
+  echo "Usage: $0 youtube_url [seconds_to_trim]"
   exit 1
 fi
 
-# 引数を変数に割り当て
+# YouTubeのURLは必須
 youtube_url=$1
-seconds_to_trim=$2
+
+# seconds_to_trimのデフォルト値を設定
+# 引数が指定されていない場合は185を使用
+seconds_to_trim=${2:-185}
 
 # yt-dlpで使用する出力テンプレートを定義
 output_template="伊集院光_深夜の馬鹿力_%(upload_date>%Y年%m月%d日)s.%(ext)s"
