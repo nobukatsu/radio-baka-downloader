@@ -14,7 +14,7 @@ output_template="%(title)s.%(ext)s"
 
 # yt-dlpで音声ファイルをダウンロードし、オリジナルのファイル名を取得
 echo "Downloading audio from YouTube..."
-original_file=$(yt-dlp --quiet --print after_move:filepath --add-metadata --audio-format m4a -x -o "$output_template" "$youtube_url" --cookies-from-browser safari)
+original_file=$(yt-dlp --quiet --console-title --print after_move:filepath --add-metadata --audio-format m4a -x -o "$output_template" "$youtube_url" --cookies-from-browser safari)
 
 # スペースを含むファイル名を_に置換した新しいファイル名を作成
 input_file=$(echo "$original_file" | sed 's/[[:space:]]/_/g' | sed 's/　/_/g')
